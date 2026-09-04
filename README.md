@@ -1,20 +1,88 @@
 # OpenStax CLI
 
-Search, access, download, and extract OpenStax textbook content from the terminal.
+[![CI](https://github.com/johnnylibretexts/openstax-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnylibretexts/openstax-cli/actions/workflows/ci.yml)
 
-This is a CLI Printing Press `*-pp-cli` tool. Its API spec is accepted by CLI Printing Press and the project includes the generated-style build and tool manifests. It uses the public OpenStax catalog endpoint and the same versioned archive data consumed by the web reader. The linked `openstax/openstax_api` project is a Ruby API helper; this CLI keeps that API origin clear while using the live public catalog/archive surfaces exposed by OpenStax.
+Read OpenStax textbooks from the command line: search the catalog, walk a book's
+table of contents, pull the full text of any page, or save an entire book as
+text, JSON, HTML, or PDF.
+
+[OpenStax](https://openstax.org) is a nonprofit publisher at Rice University that
+produces free, peer-reviewed, openly licensed college textbooks. The catalog
+holds 110 books — 76 of them currently in print — across Business, College
+Success, Computer Science, Humanities, Math, Nursing, Science, and Social
+Sciences. All of it is public, so **this tool needs no account, API key, or
+token.**
+
+It exists because that content is awkward to reach programmatically. The catalog
+is a single JSON endpoint, but a book's actual text lives in a versioned archive
+whose address is only discoverable from the state embedded in the web reader's
+HTML. This CLI does that discovery for you and returns readable text instead of
+page markup — and ships a compact, bounded JSON contract (`--agent`) built for
+LLM tool use.
+
+## Requirements
+
+Go 1.26 or newer, and network access to `openstax.org`. No credentials.
 
 ## Install
 
 ```bash
-make build
-./bin/openstax-pp-cli --version
+go install github.com/johnnylibretexts/openstax-cli/cmd/openstax-pp-cli@latest
 ```
 
-Install the released binary directly:
+Or build from a clone:
 
 ```bash
-go install github.com/johnnylibretexts/openstax-cli/cmd/openstax-pp-cli@latest
+make build && ./bin/openstax-pp-cli --version
+```
+
+The binary is named `openstax-pp-cli`. `make install` also links it as
+`openstax-cli`; both names run the same tool. The `-pp-` marks it as a CLI
+Printing Press tool — see [Project notes](#project-notes).
+
+## Try it
+
+Find a book:
+
+```console
+$ openstax-pp-cli search "data science"
+TITLE                       SLUG                     STATE  SUBJECTS
+Principles of Data Science  principles-data-science  live   Computer Science, Business, Math
+```
+
+Inspect it — note that `license` is the book's license, not this tool's:
+
+```console
+$ openstax-pp-cli info principles-data-science
+Principles of Data Science
+slug: principles-data-science
+state: live
+subjects: Computer Science, Business, Math
+pdf: https://assets.openstax.org/oscms-prodcms/media/documents/Principles-of-Data-Science-WEB.pdf
+archive: https://openstax.org/apps/archive/20260604.144757
+license: Creative Commons Attribution-NonCommercial-ShareAlike License
+pages: 112
+```
+
+List the pages you can extract:
+
+```console
+$ openstax-pp-cli toc principles-data-science --flat | head -3
+preface	Preface	https://openstax.org/books/principles-data-science/pages/preface
+1-introduction	Introduction	https://openstax.org/books/principles-data-science/pages/1-introduction
+1-1-what-is-data-science	1.1 What Is Data Science?	https://openstax.org/books/principles-data-science/pages/1-1-what-is-data-science
+```
+
+Read one:
+
+```console
+$ openstax-pp-cli extract principles-data-science --page 1-3-data-and-datasets | head -6
+# 1.3 Data and Datasets
+https://openstax.org/books/principles-data-science/pages/1-3-data-and-datasets
+
+1.3
+
+Data and Datasets
 ```
 
 ## Quick Start
@@ -48,6 +116,8 @@ A download that fails partway through removes its partial file.
 - `extract BOOK` extracts one page or the whole book as `text`, `json`, or `html`.
 - `download BOOK` saves a catalog PDF or extracted textbook content.
 
+Retired books are hidden unless you pass `--include-retired`.
+
 Whole-book extraction walks only leaf nodes marked by OpenStax as `book-content`, preserving table, example, exercise, figure-caption, and other readable text without duplicating unit and chapter containers. Extracted resource links are converted to absolute OpenStax URLs so saved JSON and HTML can still access images.
 
 `BOOK` can be a slug such as `principles-data-science`, a catalog path such as `books/principles-data-science`, or a full OpenStax book/page URL.
@@ -55,6 +125,13 @@ Whole-book extraction walks only leaf nodes marked by OpenStax as `book-content`
 ## Agent Mode
 
 `--json` preserves the complete upstream-shaped JSON intended for scripts and inspection. `--agent` uses a smaller, versioned contract intended for fast, lower-capability tool-using models.
+
+Every agent response is a single line, so a tool harness can read one line and parse it:
+
+```console
+$ openstax-pp-cli search "data science" --limit 3 --agent
+{"schema_version":"1","ok":true,"data":[{"slug":"principles-data-science","title":"Principles of Data Science","state":"live","subjects":["Computer Science","Business","Math"]}],"meta":{"command":"search","count":1,"offset":0,"limit":3,"total":1,"has_more":false}}
+```
 
 Discover the contract without making a network request:
 
@@ -83,6 +160,16 @@ with `--all`; paginate whole-book extraction with `--offset` instead.
 `extract --all --agent` returns one page by default and supports `--limit` up to 5. Agent mode intentionally excludes raw HTML; use `--json --include-html` when complete HTML is required.
 
 Agent errors are written to stdout alongside successful responses, so a harness that captures only stdout still receives a structured failure; the exit status is still nonzero. Errors use stable codes such as `book_not_found`, `page_not_found`, and `invalid_arguments`, plus a suggested recovery action. Because `download` writes to the filesystem, agent mode requires an explicit `--output` path and returns the path, kind, and byte count after writing.
+
+`SKILL.md` packages all of this as an agent skill.
+
+## Project notes
+
+This is a CLI Printing Press `*-pp-cli` tool: `spec.yaml` is the API spec accepted
+by CLI Printing Press, and `tools-manifest.json` is the generated-style tool
+manifest. The upstream `openstax/openstax_api` project referenced in the User-Agent
+is a Ruby API helper; this CLI names it to keep the API origin clear while reading
+the live public catalog and archive surfaces.
 
 ## Source Notes
 
