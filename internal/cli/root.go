@@ -19,6 +19,7 @@ const version = "0.1.0"
 type flags struct {
 	asJSON        bool
 	agent         bool
+	noCache       bool
 	timeout       time.Duration
 	clientFactory clientFactory
 }
@@ -58,6 +59,7 @@ func rootCmdWithClient(factory clientFactory) (*cobra.Command, *flags) {
 	}
 	root.PersistentFlags().BoolVar(&f.asJSON, "json", false, "Output complete JSON")
 	root.PersistentFlags().BoolVar(&f.agent, "agent", false, "Use the compact, versioned agent JSON contract")
+	root.PersistentFlags().BoolVar(&f.noCache, "no-cache", false, "Ignore the cached catalog and fetch a fresh copy")
 	root.PersistentFlags().DurationVar(&f.timeout, "timeout", 60*time.Second, "HTTP request timeout; for PDF downloads this bounds the response headers, not the transfer")
 	root.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		if f.agent {
@@ -102,16 +104,33 @@ func ExitCode(err error) int {
 	return 1
 }
 
+// cacheConfigurable is implemented by the real client. Test doubles need not be.
+type cacheConfigurable interface{ SetCacheTTL(time.Duration) }
+
+func disableCache(c openstaxClient) {
+	if configurable, ok := c.(cacheConfigurable); ok {
+		configurable.SetCacheTTL(0)
+	}
+}
+
 func clientAndContext(f *flags) (openstaxClient, context.Context) {
-	return f.clientFactory(f.timeout), context.Background()
+	c := f.clientFactory(f.timeout)
+	if f.noCache {
+		disableCache(c)
+	}
+	return c, context.Background()
 }
 
 func doctorCmd(f *flags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Check OpenStax catalog connectivity.",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, ctx := clientAndContext(f)
+			// doctor reports whether the catalog is reachable, so it must never be
+			// answered from the cache.
+			disableCache(c)
 			cat, err := c.Catalog(ctx)
 			if err != nil {
 				return err
@@ -141,6 +160,7 @@ func booksCmd(f *flags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "books",
 		Short: "List OpenStax textbooks.",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, ctx := clientAndContext(f)
 			cat, err := c.Catalog(ctx)
@@ -441,8 +461,11 @@ func downloadCmd(f *flags) *cobra.Command {
 					return err
 				}
 				pages := openstax.FlattenPages(archive.Tree)
+				if len(pages) == 0 {
+					return fmt.Errorf("%q has no extractable pages", archive.Title)
+				}
 				if !all {
-					if pageRef == "" && len(pages) > 0 {
+					if pageRef == "" {
 						pageRef = pages[0].Slug
 					}
 					page, ok := openstax.FindPage(archive.Tree, pageRef)
@@ -465,14 +488,19 @@ func downloadCmd(f *flags) *cobra.Command {
 				}
 				written = int64(len(content))
 			}
-			if f.agent {
-				absolutePath, err := filepath.Abs(outPath)
-				if err != nil {
-					return err
-				}
-				return writeAgentSuccess(cmd.OutOrStdout(), "download", agentDownloadResult{Path: absolutePath, Kind: kind, Bytes: written}, nil)
+			absolutePath, err := filepath.Abs(outPath)
+			if err != nil {
+				return err
 			}
-			return nil
+			result := agentDownloadResult{Path: absolutePath, Kind: kind, Bytes: written}
+			if f.agent {
+				return writeAgentSuccess(cmd.OutOrStdout(), "download", result, nil)
+			}
+			if f.asJSON {
+				return openstax.WriteJSON(cmd.OutOrStdout(), result)
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "wrote %s (%d bytes)\n", outPath, written)
+			return err
 		},
 	}
 	cmd.Flags().StringVarP(&outPath, "output", "o", "", "Output file path")

@@ -223,3 +223,91 @@ func agentErrorCode(t *testing.T, output string) string {
 	}
 	return got.Error.Code
 }
+
+// A cacheConfigurable test double, so we can assert which commands bypass the
+// catalog cache without reaching the network.
+type cacheSpyClient struct {
+	*fakeOpenStaxClient
+	ttlCalls []time.Duration
+}
+
+func (c *cacheSpyClient) SetCacheTTL(ttl time.Duration) {
+	c.ttlCalls = append(c.ttlCalls, ttl)
+}
+
+func executeWithSpy(t *testing.T, spy *cacheSpyClient, args ...string) error {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	return executeArgsWithClient(args, &stdout, &stderr, func(time.Duration) openstaxClient { return spy })
+}
+
+// doctor reports whether the catalog is reachable, so a cached answer would be
+// a false positive.
+func TestDoctorAlwaysBypassesTheCache(t *testing.T) {
+	spy := &cacheSpyClient{fakeOpenStaxClient: &fakeOpenStaxClient{}}
+	if err := executeWithSpy(t, spy, "doctor"); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	if len(spy.ttlCalls) == 0 || spy.ttlCalls[len(spy.ttlCalls)-1] != 0 {
+		t.Fatalf("doctor did not disable the cache: %v", spy.ttlCalls)
+	}
+}
+
+func TestNoCacheFlagBypassesTheCache(t *testing.T) {
+	spy := &cacheSpyClient{fakeOpenStaxClient: &fakeOpenStaxClient{}}
+	if err := executeWithSpy(t, spy, "books", "--no-cache"); err != nil {
+		t.Fatalf("books --no-cache: %v", err)
+	}
+	if len(spy.ttlCalls) != 1 || spy.ttlCalls[0] != 0 {
+		t.Fatalf("--no-cache did not disable the cache: %v", spy.ttlCalls)
+	}
+}
+
+func TestCachedCommandsLeaveTheCacheAlone(t *testing.T) {
+	spy := &cacheSpyClient{fakeOpenStaxClient: &fakeOpenStaxClient{}}
+	if err := executeWithSpy(t, spy, "books"); err != nil {
+		t.Fatalf("books: %v", err)
+	}
+	if len(spy.ttlCalls) != 0 {
+		t.Fatalf("books should use the cache by default, got %v", spy.ttlCalls)
+	}
+}
+
+func TestCommandsWithoutArgumentsRejectStrayArguments(t *testing.T) {
+	for _, args := range [][]string{{"doctor", "stray"}, {"books", "stray"}, {"schema", "stray"}} {
+		t.Run(args[0], func(t *testing.T) {
+			fake := &fakeOpenStaxClient{}
+			if _, _, err := executeWithFake(t, fake, args...); err == nil {
+				t.Fatalf("%v silently ignored a stray argument", args)
+			}
+		})
+	}
+}
+
+func TestPlainDownloadReportsWhatItWrote(t *testing.T) {
+	book, archive, pageHTML := testBookAndArchive(2)
+	fake := &fakeOpenStaxClient{book: book, archive: archive, pageHTML: pageHTML}
+	outPath := filepath.Join(t.TempDir(), "book.txt")
+
+	stdout, stderr, err := executeWithFake(t, fake, "download", "example-book", "--kind", "text", "--output", outPath)
+	if err != nil {
+		t.Fatalf("download: %v; stderr=%s", err, stderr)
+	}
+	if !strings.Contains(stdout, outPath) || !strings.Contains(stdout, "bytes") {
+		t.Fatalf("download gave no confirmation: %q", stdout)
+	}
+}
+
+func TestDownloadOfBookWithNoPagesExplainsItself(t *testing.T) {
+	book, archive, pageHTML := testBookAndArchive(0)
+	fake := &fakeOpenStaxClient{book: book, archive: archive, pageHTML: pageHTML}
+	outPath := filepath.Join(t.TempDir(), "book.txt")
+
+	_, _, err := executeWithFake(t, fake, "download", "example-book", "--kind", "text", "--output", outPath, "--all=false")
+	if err == nil {
+		t.Fatal("expected an error for a book with no extractable pages")
+	}
+	if !strings.Contains(err.Error(), "no extractable pages") {
+		t.Fatalf("unhelpful error: %v", err)
+	}
+}

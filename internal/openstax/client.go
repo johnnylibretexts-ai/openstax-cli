@@ -24,6 +24,9 @@ type Client struct {
 	// would abort large downloads partway through. A response-header timeout still
 	// fails fast when the server itself is unresponsive.
 	downloadClient *http.Client
+	cacheTTL       time.Duration
+	// catalogURL is a field so tests can point Catalog at a local server.
+	catalogURL string
 }
 
 func New(timeout time.Duration) *Client {
@@ -35,7 +38,16 @@ func New(timeout time.Duration) *Client {
 	return &Client{
 		httpClient:     &http.Client{Timeout: timeout},
 		downloadClient: &http.Client{Transport: transport},
+		cacheTTL:       DefaultCacheTTL,
+		catalogURL:     CatalogURL,
 	}
+}
+
+// SetCacheTTL bounds how long a cached catalog may be reused. Zero disables
+// reading from the cache, which is what --no-cache and doctor need: doctor exists
+// to prove the catalog is reachable, so answering it from disk would be a lie.
+func (c *Client) SetCacheTTL(ttl time.Duration) {
+	c.cacheTTL = ttl
 }
 
 func (c *Client) Get(ctx context.Context, rawURL string) ([]byte, error) {
@@ -80,12 +92,21 @@ func (c *Client) Download(ctx context.Context, rawURL string, w io.Writer) (int6
 
 func (c *Client) Catalog(ctx context.Context) (CatalogResponse, error) {
 	var out CatalogResponse
-	body, err := c.Get(ctx, CatalogURL)
+	if cached, ok := readCatalogCache(c.cacheTTL); ok {
+		if err := json.Unmarshal(cached, &out); err == nil {
+			return out, nil
+		}
+		// A corrupt cache entry is not fatal; fall through to a live fetch.
+	}
+	body, err := c.Get(ctx, c.catalogURL)
 	if err != nil {
 		return out, err
 	}
-	err = json.Unmarshal(body, &out)
-	return out, err
+	if err := json.Unmarshal(body, &out); err != nil {
+		return out, err
+	}
+	writeCatalogCache(body)
+	return out, nil
 }
 
 func (c *Client) ResolveBook(ctx context.Context, ref string) (Book, error) {

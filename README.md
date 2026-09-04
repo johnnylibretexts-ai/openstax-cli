@@ -118,6 +118,10 @@ A download that fails partway through removes its partial file.
 
 Retired books are hidden unless you pass `--include-retired`.
 
+The book catalog is cached for 24 hours under your user cache directory, so most
+commands skip a 338 KB download. Pass `--no-cache` to force a fresh copy. `doctor`
+always ignores the cache, since its job is to prove the catalog is reachable.
+
 Whole-book extraction walks only leaf nodes marked by OpenStax as `book-content`, preserving table, example, exercise, figure-caption, and other readable text without duplicating unit and chapter containers. Extracted resource links are converted to absolute OpenStax URLs so saved JSON and HTML can still access images.
 
 `BOOK` can be a slug such as `principles-data-science`, a catalog path such as `books/principles-data-science`, or a full OpenStax book/page URL.

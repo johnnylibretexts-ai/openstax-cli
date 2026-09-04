@@ -51,7 +51,7 @@ openstax-pp-cli download principles-data-science --kind html -o principles-data-
 openstax-pp-cli download principles-data-science --kind pdf -o principles-data-science.pdf --agent
 ```
 
-`BOOK` accepts a slug, an OpenStax catalog path, or a full book/page URL. Extracted image and link targets are absolute OpenStax URLs. Preserve the license and attribution returned by `info` when reusing textbook content.
+The catalog is cached for 24 hours; pass `--no-cache` if you need to see a just-published book. `BOOK` accepts a slug, an OpenStax catalog path, or a full book/page URL. Extracted image and link targets are absolute OpenStax URLs. Preserve the license and attribution returned by `info` when reusing textbook content.
 
 ## Agent Contract
 
