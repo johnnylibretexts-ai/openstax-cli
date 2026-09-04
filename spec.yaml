@@ -32,6 +32,7 @@ agent_contract:
     extract_max_chars: 12000
   constraints:
     - "Agent JSON is emitted as one compact line."
+    - "Agent JSON is written to stdout for both success and error responses."
     - "Agent extraction does not return raw HTML."
     - "Agent downloads require an explicit output path."
 

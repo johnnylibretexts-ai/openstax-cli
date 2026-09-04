@@ -82,7 +82,7 @@ with `--all`; paginate whole-book extraction with `--offset` instead.
 
 `extract --all --agent` returns one page by default and supports `--limit` up to 5. Agent mode intentionally excludes raw HTML; use `--json --include-html` when complete HTML is required.
 
-Errors use stable codes such as `book_not_found`, `page_not_found`, and `invalid_arguments`, plus a suggested recovery action. Because `download` writes to the filesystem, agent mode requires an explicit `--output` path and returns the path, kind, and byte count after writing.
+Agent errors are written to stdout alongside successful responses, so a harness that captures only stdout still receives a structured failure; the exit status is still nonzero. Errors use stable codes such as `book_not_found`, `page_not_found`, and `invalid_arguments`, plus a suggested recovery action. Because `download` writes to the filesystem, agent mode requires an explicit `--output` path and returns the path, kind, and byte count after writing.
 
 ## Source Notes
 

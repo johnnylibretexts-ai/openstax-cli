@@ -61,4 +61,4 @@ Agent defaults are intentionally bounded: search returns 5 books, books returns 
 
 Do not combine `--start-char` with `--all`; it is a cursor into a single page, so paginate whole-book extraction with `--offset` and continue individual pages with `--page PAGE --start-char N`. Do not combine `--agent` with `--include-html`. Use raw `--json` when complete upstream records or HTML are required. `download --agent` requires an explicit `--output` because it writes a file.
 
-Errors are compact JSON on stderr, return a nonzero exit status, and include `code`, `message`, `suggestion`, and `retryable`.
+Errors are compact JSON on stdout, the same stream as successful responses, so a single captured stream always holds the result. They return a nonzero exit status and include `code`, `message`, `suggestion`, and `retryable`. Parse stdout and branch on `ok` rather than on the exit status alone.

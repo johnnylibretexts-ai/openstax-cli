@@ -56,8 +56,8 @@ func TestAgentErrorsAreStructuredAndReportedOnce(t *testing.T) {
 	if !ErrorAlreadyReported(err) {
 		t.Fatalf("agent error should be marked reported: %v", err)
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("unexpected stdout: %s", stdout.String())
+	if stderr.Len() != 0 {
+		t.Fatalf("agent errors belong on stdout, but stderr had: %s", stderr.String())
 	}
 
 	var got struct {
@@ -67,8 +67,8 @@ func TestAgentErrorsAreStructuredAndReportedOnce(t *testing.T) {
 			Suggestion string `json:"suggestion"`
 		} `json:"error"`
 	}
-	if err := json.Unmarshal(stderr.Bytes(), &got); err != nil {
-		t.Fatalf("decode agent error: %v; output=%q", err, stderr.String())
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("decode agent error: %v; output=%q", err, stdout.String())
 	}
 	if got.OK {
 		t.Fatal("error envelope reported ok=true")
@@ -181,8 +181,8 @@ func TestAgentDownloadRequiresExplicitOutputBeforeNetworkAccess(t *testing.T) {
 			Code string `json:"code"`
 		} `json:"error"`
 	}
-	if decodeErr := json.Unmarshal(stderr.Bytes(), &got); decodeErr != nil {
-		t.Fatalf("decode agent error: %v; output=%q", decodeErr, stderr.String())
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &got); decodeErr != nil {
+		t.Fatalf("decode agent error: %v; output=%q", decodeErr, stdout.String())
 	}
 	if got.Error.Code != "output_required" {
 		t.Fatalf("error code = %q, want output_required", got.Error.Code)

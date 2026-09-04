@@ -381,8 +381,14 @@ func executeArgsWithClient(args []string, stdout, stderr io.Writer, factory clie
 	if err == nil || (!f.agent && !argsRequestAgent(args)) {
 		return err
 	}
-	if writeErr := writeAgentError(stderr, err); writeErr != nil {
-		return fmt.Errorf("%w; report agent error: %v", err, writeErr)
+	// The envelope goes to stdout, alongside successful responses, so that a
+	// harness capturing only stdout still receives a structured failure instead
+	// of nothing. Fall back to stderr if stdout is unusable, rather than losing
+	// the error entirely.
+	if writeErr := writeAgentError(stdout, err); writeErr != nil {
+		if fallbackErr := writeAgentError(stderr, err); fallbackErr != nil {
+			return fmt.Errorf("%w; report agent error: %v", err, writeErr)
+		}
 	}
 	return &reportedError{err: err}
 }

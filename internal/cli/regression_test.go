@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // download --page used to be silently ignored, because --all defaults to true so
@@ -56,11 +58,11 @@ func TestDownloadRejectsPageWithExplicitAll(t *testing.T) {
 	fake := &fakeOpenStaxClient{book: book, archive: archive, pageHTML: pageHTML}
 	outPath := filepath.Join(t.TempDir(), "book.txt")
 
-	_, stderr, err := executeWithFake(t, fake, "download", "example-book", "--kind", "text", "--output", outPath, "--page", "page-01", "--all", "--agent")
+	stdout, _, err := executeWithFake(t, fake, "download", "example-book", "--kind", "text", "--output", outPath, "--page", "page-01", "--all", "--agent")
 	if err == nil {
 		t.Fatal("expected --page with explicit --all to fail")
 	}
-	if code := agentErrorCode(t, stderr); code != "conflicting_page_selection" {
+	if code := agentErrorCode(t, stdout); code != "conflicting_page_selection" {
 		t.Fatalf("error code = %q", code)
 	}
 }
@@ -123,14 +125,17 @@ func TestTruthyAgentSpellingsStillReportJSONErrors(t *testing.T) {
 	for _, spelling := range []string{"--agent", "--agent=true", "--agent=1", "--agent=t", "--agent=TRUE"} {
 		t.Run(spelling, func(t *testing.T) {
 			fake := &fakeOpenStaxClient{}
-			_, stderr, err := executeWithFake(t, fake, "extract", "example-book", "--all", "--page", "page-01", spelling)
+			stdout, stderr, err := executeWithFake(t, fake, "extract", "example-book", "--all", "--page", "page-01", spelling)
 			if err == nil {
 				t.Fatal("expected an error")
 			}
 			if !ErrorAlreadyReported(err) {
 				t.Fatalf("%s did not report through the agent envelope", spelling)
 			}
-			if code := agentErrorCode(t, stderr); code != "conflicting_page_selection" {
+			if stderr != "" {
+				t.Fatalf("%s wrote to stderr: %s", spelling, stderr)
+			}
+			if code := agentErrorCode(t, stdout); code != "conflicting_page_selection" {
 				t.Fatalf("error code = %q", code)
 			}
 		})
@@ -139,12 +144,12 @@ func TestTruthyAgentSpellingsStillReportJSONErrors(t *testing.T) {
 
 func TestFalsyAgentSpellingsKeepPlainTextErrors(t *testing.T) {
 	fake := &fakeOpenStaxClient{}
-	_, stderr, err := executeWithFake(t, fake, "extract", "example-book", "--all", "--page", "page-01", "--agent=false")
+	stdout, stderr, err := executeWithFake(t, fake, "extract", "example-book", "--all", "--page", "page-01", "--agent=false")
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	if ErrorAlreadyReported(err) || strings.Contains(stderr, "schema_version") {
-		t.Fatalf("--agent=false should not emit an agent envelope: %s", stderr)
+	if ErrorAlreadyReported(err) || strings.Contains(stdout+stderr, "schema_version") {
+		t.Fatalf("--agent=false should not emit an agent envelope: %s%s", stdout, stderr)
 	}
 }
 
@@ -155,11 +160,11 @@ func TestExtractRejectsStartCharWithAll(t *testing.T) {
 	pageHTML["page-02"] = `<html><body><div data-book-content="true"><p>hi</p></div></body></html>`
 	fake := &fakeOpenStaxClient{book: book, archive: archive, pageHTML: pageHTML}
 
-	_, stderr, err := executeWithFake(t, fake, "extract", "example-book", "--all", "--limit", "3", "--start-char", "5", "--agent")
+	stdout, _, err := executeWithFake(t, fake, "extract", "example-book", "--all", "--limit", "3", "--start-char", "5", "--agent")
 	if err == nil {
 		t.Fatal("expected --start-char with --all to fail")
 	}
-	if code := agentErrorCode(t, stderr); code != "conflicting_text_offset" {
+	if code := agentErrorCode(t, stdout); code != "conflicting_text_offset" {
 		t.Fatalf("error code = %q", code)
 	}
 }
@@ -183,15 +188,38 @@ func TestExtractStartCharStillWorksForOnePage(t *testing.T) {
 	}
 }
 
-func agentErrorCode(t *testing.T, stderr string) string {
+// Agent errors go to stdout so harnesses that capture only stdout still see a
+// structured failure, but an unusable stdout must not swallow the error.
+func TestAgentErrorFallsBackToStderrWhenStdoutFails(t *testing.T) {
+	var stderr bytes.Buffer
+	writeErr := errors.New("stdout is closed")
+	fake := &fakeOpenStaxClient{}
+
+	err := executeArgsWithClient(
+		[]string{"extract", "example-book", "--all", "--page", "page-01", "--agent"},
+		failingWriter{err: writeErr}, &stderr,
+		func(time.Duration) openstaxClient { return fake },
+	)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !ErrorAlreadyReported(err) {
+		t.Fatalf("fallback envelope should still count as reported: %v", err)
+	}
+	if code := agentErrorCode(t, stderr.String()); code != "conflicting_page_selection" {
+		t.Fatalf("error code = %q", code)
+	}
+}
+
+func agentErrorCode(t *testing.T, output string) string {
 	t.Helper()
 	var got struct {
 		Error struct {
 			Code string `json:"code"`
 		} `json:"error"`
 	}
-	if err := json.Unmarshal([]byte(stderr), &got); err != nil {
-		t.Fatalf("stderr is not an agent envelope (%v): %s", err, stderr)
+	if err := json.Unmarshal([]byte(output), &got); err != nil {
+		t.Fatalf("output is not an agent envelope (%v): %s", err, output)
 	}
 	return got.Error.Code
 }

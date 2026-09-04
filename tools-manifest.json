@@ -11,6 +11,7 @@
     "schema_version": "1",
     "discover_command": "openstax-pp-cli schema --agent",
     "response_format": "compact_json_envelope",
+    "response_stream": "stdout",
     "list_continuation": "next_offset",
     "text_continuation": "next_start_char",
     "defaults": {
