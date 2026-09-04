@@ -1,0 +1,92 @@
+name: openstax
+description: "Search, access, download, and extract OpenStax textbook content from the public catalog and archive"
+version: "0.1.0"
+category: education
+base_url: "https://openstax.org"
+http_transport: standard
+health_check_path: "/apps/cms/api/books/?format=json"
+cli_description: "Search and extract OpenStax textbooks from your terminal, including full-book text/html/json extraction."
+
+required_headers:
+  - name: User-Agent
+    value: "openstax-pp-cli/0.1 (+https://github.com/openstax/openstax_api; OpenStax public catalog/archive client)"
+  - name: Accept
+    value: "application/json, application/xhtml+xml, text/html;q=0.9, */*;q=0.8"
+
+auth:
+  type: none
+
+agent_contract:
+  schema_version: "1"
+  discover_command: "openstax-pp-cli schema --agent"
+  response_format: compact_json_envelope
+  success_fields: [schema_version, ok, data, meta]
+  error_fields: [schema_version, ok, error]
+  pagination_fields: [offset, limit, total, has_more, next_offset]
+  text_continuation_fields: [char_start, char_end, total_chars, truncated, next_start_char]
+  defaults:
+    books_limit: 10
+    search_limit: 5
+    toc_limit: 20
+    extract_page_limit: 1
+    extract_max_chars: 12000
+  constraints:
+    - "Agent JSON is emitted as one compact line."
+    - "Agent extraction does not return raw HTML."
+    - "Agent downloads require an explicit output path."
+
+resources:
+  books:
+    description: "OpenStax public textbook catalog"
+    endpoints:
+      list:
+        method: GET
+        path: "/apps/cms/api/books/?format=json"
+        description: "Fetch all catalog books"
+        response_format: json
+      search:
+        method: GET
+        path: "/apps/cms/api/books/?format=json"
+        description: "Fetch catalog and locally filter by query, subject, and retired/live state"
+        response_format: json
+  archive:
+    description: "OpenStax reader/archive textbook contents"
+    endpoints:
+      book:
+        method: GET
+        path: "/apps/archive/{archiveVersion}/contents/{bookID}@{contentVersion}.json"
+        description: "Fetch a textbook archive tree"
+        response_format: json
+      page:
+        method: GET
+        path: "/apps/archive/{archiveVersion}/contents/{bookID}@{contentVersion}:{pageID}.xhtml"
+        description: "Fetch one textbook page as XHTML"
+        response_format: html
+
+types:
+  Book:
+    fields:
+      - name: id
+        type: int
+      - name: slug
+        type: string
+      - name: title
+        type: string
+      - name: subjects
+        type: array
+      - name: pdf_url
+        type: string
+      - name: webview_rex_link
+        type: string
+  ExtractedPage:
+    fields:
+      - name: book_title
+        type: string
+      - name: page_title
+        type: string
+      - name: page_slug
+        type: string
+      - name: text
+        type: string
+      - name: html
+        type: string

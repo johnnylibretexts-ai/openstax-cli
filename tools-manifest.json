@@ -1,0 +1,79 @@
+{
+  "api_name": "openstax",
+  "base_url": "https://openstax.org",
+  "description": "Search, inspect, download, and extract complete OpenStax textbooks as PDF, text, JSON, or HTML.",
+  "mcp_ready": "cli-only",
+  "http_transport": "standard",
+  "auth": {
+    "type": "none"
+  },
+  "agent_contract": {
+    "schema_version": "1",
+    "discover_command": "openstax-pp-cli schema --agent",
+    "response_format": "compact_json_envelope",
+    "list_continuation": "next_offset",
+    "text_continuation": "next_start_char",
+    "defaults": {
+      "books_limit": 10,
+      "search_limit": 5,
+      "toc_limit": 20,
+      "extract_page_limit": 1,
+      "extract_max_chars": 12000
+    },
+    "download_requires_output": true,
+    "raw_html_in_agent_mode": false
+  },
+  "required_headers": [
+    {
+      "name": "User-Agent",
+      "value": "openstax-pp-cli/0.1 (+https://github.com/openstax/openstax_api; OpenStax public catalog/archive client)"
+    },
+    {
+      "name": "Accept",
+      "value": "application/json, application/xhtml+xml, text/html;q=0.9, */*;q=0.8"
+    }
+  ],
+  "tools": [
+    {
+      "name": "books_list",
+      "description": "Fetch the public OpenStax textbook catalog.",
+      "method": "GET",
+      "path": "/apps/cms/api/books/?format=json",
+      "no_auth": true,
+      "params": []
+    },
+    {
+      "name": "books_search",
+      "description": "Fetch the public catalog and filter it locally by title, slug, subject, category, and publication state.",
+      "method": "GET",
+      "path": "/apps/cms/api/books/?format=json",
+      "no_auth": true,
+      "params": []
+    },
+    {
+      "name": "archive_book",
+      "description": "Fetch a versioned textbook archive tree.",
+      "method": "GET",
+      "path": "/apps/archive/{archiveVersion}/contents/{bookID}@{contentVersion}.json",
+      "no_auth": true,
+      "params": [
+        {"name": "archiveVersion", "type": "string", "location": "path", "required": true},
+        {"name": "bookID", "type": "string", "location": "path", "required": true},
+        {"name": "contentVersion", "type": "string", "location": "path", "required": true}
+      ]
+    },
+    {
+      "name": "archive_page",
+      "description": "Fetch one versioned textbook content page as XHTML.",
+      "method": "GET",
+      "path": "/apps/archive/{archiveVersion}/contents/{bookID}@{contentVersion}:{pageID}.xhtml",
+      "no_auth": true,
+      "params": [
+        {"name": "archiveVersion", "type": "string", "location": "path", "required": true},
+        {"name": "bookID", "type": "string", "location": "path", "required": true},
+        {"name": "contentVersion", "type": "string", "location": "path", "required": true},
+        {"name": "pageID", "type": "string", "location": "path", "required": true}
+      ]
+    }
+  ]
+}
