@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/johnnylibretexts/openstax-cli/internal/cli"
+	"github.com/johnnylibretexts-ai/openstax-cli/internal/cli"
 )
 
 func main() {

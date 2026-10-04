@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/johnnylibretexts/openstax-cli/internal/openstax"
+	"github.com/johnnylibretexts-ai/openstax-cli/internal/openstax"
 )
 
 func TestAgentSchemaCommandEmitsCompactEnvelope(t *testing.T) {

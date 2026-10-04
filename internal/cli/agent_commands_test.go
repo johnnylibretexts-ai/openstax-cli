@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/johnnylibretexts/openstax-cli/internal/openstax"
+	"github.com/johnnylibretexts-ai/openstax-cli/internal/openstax"
 )
 
 type fakeOpenStaxClient struct {

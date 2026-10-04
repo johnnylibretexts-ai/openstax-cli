@@ -1,4 +1,4 @@
-module github.com/johnnylibretexts/openstax-cli
+module github.com/johnnylibretexts-ai/openstax-cli
 
 go 1.26
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/johnnylibretexts/openstax-cli/internal/openstax"
+	"github.com/johnnylibretexts-ai/openstax-cli/internal/openstax"
 )
 
 const agentSchemaVersion = "1"

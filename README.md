@@ -1,6 +1,6 @@
 # OpenStax CLI
 
-[![CI](https://github.com/johnnylibretexts/openstax-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnylibretexts/openstax-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/johnnylibretexts-ai/openstax-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/johnnylibretexts-ai/openstax-cli/actions/workflows/ci.yml)
 
 Read OpenStax textbooks from the command line: search the catalog, walk a book's
 table of contents, pull the full text of any page, or save an entire book as
@@ -27,7 +27,7 @@ Go 1.26 or newer, and network access to `openstax.org`. No credentials.
 ## Install
 
 ```bash
-go install github.com/johnnylibretexts/openstax-cli/cmd/openstax-pp-cli@latest
+go install github.com/johnnylibretexts-ai/openstax-cli/cmd/openstax-pp-cli@latest
 ```
 
 Or build from a clone:
@@ -180,7 +180,7 @@ the live public catalog and archive surfaces.
 - Catalog: `https://openstax.org/apps/cms/api/books/?format=json`
 - Web reader pages: `https://openstax.org/books/{book}/pages/{page}`
 - Archive: discovered from the reader's `window.__PRELOADED_STATE__`, then fetched from `/apps/archive/{archiveVersion}/contents/{bookID}@{contentVersion}.json` and versioned page `.xhtml` files.
-- Import behavior was cross-checked against the OpenStax importer in [`johnnylibretexts/libretexts-reader`](https://github.com/johnnylibretexts/libretexts-reader), while this CLI deliberately retains tables, examples, exercises, and other source content that reader streamlines for narration.
+- Import behavior was cross-checked against the OpenStax importer in [`johnnylibretexts-ai/libretexts-reader`](https://github.com/johnnylibretexts-ai/libretexts-reader), while this CLI deliberately retains tables, examples, exercises, and other source content that reader streamlines for narration.
 
 ## Contributing
 
